@@ -700,10 +700,19 @@
                 <include name="slf4j*.jar" />
                 <include name="servlet-api*.jar" />
                 <include name="compress-lzf*.jar" />
+                <include name="netty-3.3.0*.jar" />
+                <include name="kryo*.jar" />
+                <include name="minlog*.jar" />
+                <include name="objenesis*.jar" />
+                <include name="reflectasm*.jar" />
             </zipgroupfileset>
             <zipgroupfileset dir="lib/spark">
                 <include name="mesos*.jar" />
             </zipgroupfileset>
+            <zipfileset src="${ivy.lib.dir}/akka-actor-2.0.2.jar"  excludes="reference.conf"/>
+            <zipfileset src="${ivy.lib.dir}/akka-remote-2.0.2.jar" excludes="reference.conf"/>
+            <zipfileset src="${ivy.lib.dir}/akka-slf4j-2.0.2.jar" />
+            <fileset file="lib/spark/reference.conf" />
             <fileset file="${basedir}/src/pig-default.properties" />
             <fileset file="${basedir}/src/main/jruby/pigudf.rb" />
             <exclude name="hadoop-site.xml" />
@@ -796,10 +805,19 @@
                 <include name="slf4j*.jar" />
                 <include name="servlet-api*.jar" />
                 <include name="compress-lzf*.jar" />
+                <include name="netty-3.3.0*.jar" />
+                <include name="kryo*.jar" />
+                <include name="minlog*.jar" />
+                <include name="objenesis*.jar" />
+                <include name="reflectasm*.jar" />
             </zipgroupfileset>
             <zipgroupfileset dir="lib/spark">
                 <include name="mesos*.jar" />
             </zipgroupfileset>
+            <zipfileset src="${ivy.lib.dir}/akka-actor-2.0.2.jar"  excludes="reference.conf"/>
+            <zipfileset src="${ivy.lib.dir}/akka-remote-2.0.2.jar" excludes="reference.conf"/>
+            <zipfileset src="${ivy.lib.dir}/akka-slf4j-2.0.2.jar" />
+            <fileset file="lib/spark/reference.conf" />
             <fileset file="${basedir}/src/pig-default.properties" />
             <fileset file="${basedir}/src/main/jruby/pigudf.rb" />
             <exclude name="hadoop-site.xml" />
