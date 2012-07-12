@@ -1,11 +1,13 @@
 package org.apache.pig.backend.hadoop.executionengine.spark;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.*;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.Path;
 import org.apache.pig.PigException;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.Launcher;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.MRCompiler;
@@ -17,11 +19,13 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOpe
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POFilter;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POForEach;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POGlobalRearrange;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLimit;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLocalRearrange;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POPackage;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.util.PlanHelper;
+import org.apache.pig.backend.hadoop.executionengine.spark.converter.LimitConverter;
 import org.apache.pig.backend.hadoop.executionengine.spark.converter.POConverter;
 import org.apache.pig.backend.hadoop.executionengine.spark.converter.CacheConverter;
 import org.apache.pig.backend.hadoop.executionengine.spark.converter.FilterConverter;
@@ -33,8 +37,9 @@ import org.apache.pig.backend.hadoop.executionengine.spark.converter.GlobalRearr
 import org.apache.pig.backend.hadoop.executionengine.spark.converter.PackageConverter;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.impl.PigContext;
+import org.apache.pig.impl.io.FileLocalizer;
 import org.apache.pig.impl.plan.OperatorKey;
-import org.apache.pig.tools.pigstats.PigStats;
+import org.apache.pig.tools.pigstats.*;
 import org.python.google.common.collect.Lists;
 
 import spark.RDD;
@@ -70,6 +75,8 @@ public class SparkLauncher extends Launcher {
 //        KeyTypeDiscoveryVisitor kdv = new KeyTypeDiscoveryVisitor(plan);
 //        kdv.visit();
 
+/////////
+
         startSparkIfNeeded();
 
         // initialize the supported converters
@@ -84,15 +91,19 @@ public class SparkLauncher extends Launcher {
         convertMap.put(POCache.class,   cacheConverter);
         convertMap.put(POLocalRearrange.class,  new LocalRearrangeConverter());
         convertMap.put(POGlobalRearrange.class, new GlobalRearrangeConverter());
+        convertMap.put(POLimit.class, new LimitConverter());
 
         Map<OperatorKey, RDD<Tuple>> rdds = new HashMap<OperatorKey, RDD<Tuple>>();
+
+        SparkStats stats = new SparkStats();
 
         LinkedList<POStore> stores = PlanHelper.getStores(physicalPlan);
         for (POStore poStore : stores) {
             physicalToRDD(physicalPlan, poStore, rdds, convertMap);
+            stats.addOutputInfo(poStore, 1, 1, true); // TODO: use real values
         }
 
-        return PigStats.get();
+        return stats;
     }
 
     private static void startSparkIfNeeded() throws PigException {
@@ -104,9 +115,11 @@ public class SparkLauncher extends Launcher {
             }
 
             String sparkHome = System.getenv("SPARK_HOME"); // It's okay if this is null for local mode
+            String sparkJarsSetting = System.getenv("SPARK_JARS");
+            String[] sparkJars = sparkJarsSetting == null ? new String[]{} : sparkJarsSetting.split(",");
 
             // TODO: Don't hardcode this JAR
-            List<String> jars = Collections.singletonList("build/pig-0.11.0-SNAPSHOT-withdependencies.jar");
+            List<String> jars = Lists.asList("build/pig-0.11.0-SNAPSHOT-withdependencies.jar", sparkJars);
 
             if (!master.startsWith("local")) {
                 // Check that we have the Mesos native library and Spark home are set
@@ -166,7 +179,7 @@ public class SparkLauncher extends Launcher {
         }
 
         LOG.info("Converting operator " + physicalOperator.getClass().getSimpleName()+" "+physicalOperator);
-        nextRDD = converter.convert(predecessorRdds, physicalOperator);
+        nextRDD = (RDD<Tuple>)converter.convert(predecessorRdds, physicalOperator);
 
         if (POStore.class.equals(physicalOperator.getClass())) {
             return;
